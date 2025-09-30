@@ -1,45 +1,4 @@
 services:
-  aiclient2api:
-    image: aiclient2api
-    container_name: aiclient2api-multi
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./aiclient2api/credentials:/app/credentials
-      - ./aiclient2api/config:/app/config:ro
-      - ./aiclient2api/logs:/app/logs
-    environment:
-      - ARGS=--api-key ${API_KEY} --provider-pools-file /app/config/provider_pools.json --system-prompt-file /app/config/system_prompt.txt --qwen-oauth-creds-file /app/credentials/qwen_oauth_creds.json --enable-routing --log-prompts file --kiro-oauth-creds-file /app/credentials/kiro_oauth_creds.json
-      - TZ=Asia/Shanghai
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "node", "healthcheck.js"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    labels:
-      - "com.aiclient2api.service=main"
-      - "com.aiclient2api.auto-restart=daily"
-    networks:
-      - docker-network
- # ngrok 服务
-  ngrok:
-    image: ngrok/ngrok
-    container_name: my-ngrok
-    ports:
-      - "4040:4040" # 暴露 ngrok 的 Web UI 界面
-    environment:
-      - NGROK_AUTHTOKEN=32uJt1g9ji2YO3xryegWydCQE0c_6nPprh3kzurjYUeBgFxcC
-    command:
-      - "http"
-      - "aiclient2api:3000"
-      - "--host-header=localhost:3000"
-      - "--url=amberly-postthalamic-relishingly.ngrok-free.app"
-    networks:
-      - docker-network
-    depends_on:
-      - aiclient2api
   db:
     image: mysql:${MYSQL_VERSION:-8.0}
     container_name: ai-trend-db

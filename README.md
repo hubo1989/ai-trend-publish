@@ -1,7 +1,7 @@
 # TrendPublish
 
 基于 Deno
-开发的趋势发现和内容发布系统，支持多源数据采集、智能总结和自动发布到微信公众号。
+开发的趋势发现和内容发布系统，支持多源数据采集、智能总结和自动发布到微信公众号。在原纯后端服务基础上增加了端口8080的前端服务，可以使用gui配置数据源，设置定时时间，手动触发。
 
 > 🌰 示例公众号：**AISPACE科技空间**
 
@@ -37,7 +37,7 @@ curl -fsSL https://deno.land/install.sh | sh
 ### 2. 克隆项目
 
 ```bash
-git clone https://github.com/OpenAISpace/ai-trend-publish
+git clone https://github.com/hubo1989/ai-trend-publish
 cd ai-trend-publish
 ```
 
@@ -75,6 +75,7 @@ deno task build:linux-arm64 # ARM架构
 # 编译所有平台版本
 deno task build:all
 ```
+推荐使用docker部署，修改数据源必须配置数据库
 
 ## 🌟 主要功能
 
@@ -330,36 +331,10 @@ docker run -d \
 npx ts-node -r tsconfig-paths/register src\modules\render\test\test.weixin.template.ts
 ```
 
-## 🤝 贡献指南
 
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/amazing-feature`)
-3. 提交更改 (`git commit -m 'Add some amazing feature'`)
-4. 推送到分支 (`git push origin feature/amazing-feature`)
-5. 提交 Pull Request
-
-## ❤️ 特别感谢
-
-感谢以下贡献者对项目的支持：
-
-<a href="https://github.com/kilimro">
-  <img src="https://avatars.githubusercontent.com/u/52153481?v=4" width="50" height="50" alt="kilimro">
-</a>
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=OpenAISpace/ai-trend-publish&type=Date)](https://star-history.com/#OpenAISpace/ai-trend-publish&Date)
 
 ## 📄 许可证
 
 本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
 
-### JSON-RPC API
 
-提供了基于 JSON-RPC 2.0 协议的 API，支持手动触发工作流。
-
-- 端点: `/api/workflow`
-- 支持方法: `triggerWorkflow`
-- 详细文档: [JSON-RPC API 文档](https://openaispace.github.io/ai-trend-publish/json-rpc-api.html )
-
-![](https://oss.liuyaowen.cn/image/202504242031044.png)
