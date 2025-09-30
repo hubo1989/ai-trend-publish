@@ -1,6 +1,6 @@
 {
   "name": "ai-trend-publish-frontend",
-  "version": "1.0.0",
+  "version": "0.0.4",
   "description": "数据源管理前端系统",
   "main": "index.html",
   "scripts": {

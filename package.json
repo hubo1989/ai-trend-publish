@@ -1,0 +1,30 @@
+{
+  "name": "ai-trend-publish",
+  "version": "0.0.4",
+  "description": "全自动 AI 内容生成与发布系统 | 微信公众号自动化 | 多源数据抓取",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "deno task start",
+    "test": "deno task test",
+    "build:all": "deno task build:all",
+    "build:docs": "deno task build:docs"
+  },
+  "keywords": [
+    "ai",
+    "content-generation",
+    "wechat",
+    "automation",
+    "deno",
+    "typescript"
+  ],
+  "author": "AI Trend Publish Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hubo1989/ai-trend-publish.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hubo1989/ai-trend-publish/issues"
+  },
+  "homepage": "https://github.com/hubo1989/ai-trend-publish#readme"
+}
