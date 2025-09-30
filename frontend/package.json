@@ -1,0 +1,23 @@
+{
+  "name": "ai-trend-publish-frontend",
+  "version": "1.0.0",
+  "description": "数据源管理前端系统",
+  "main": "index.html",
+  "scripts": {
+    "start": "python3 -m http.server 8080 || python -m SimpleHTTPServer 8080",
+    "serve": "npx serve -p 8080",
+    "dev": "./start.sh"
+  },
+  "keywords": [
+    "data-source",
+    "management",
+    "frontend",
+    "json-rpc"
+  ],
+  "author": "AI Trend Publish Team",
+  "license": "MIT",
+  "devDependencies": {
+    "serve": "^14.2.1"
+  }
+}
+

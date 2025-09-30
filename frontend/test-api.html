@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API 测试工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        .error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>API 测试工具</h1>
+        <p>用于测试后端API连接和CORS配置</p>
+        
+        <div class="form-group">
+            <label for="apiUrl">API 地址:</label>
+            <input type="text" id="apiUrl" value="http://localhost:8000/api/workflow">
+        </div>
+        
+        <div class="form-group">
+            <label for="apiKey">API 密钥:</label>
+            <input type="password" id="apiKey" placeholder="请输入API密钥">
+        </div>
+        
+        <div class="form-group">
+            <label for="method">方法:</label>
+            <select id="method">
+                <option value="getDataSources">getDataSources</option>
+                <option value="createDataSource">createDataSource</option>
+                <option value="updateDataSource">updateDataSource</option>
+                <option value="deleteDataSource">deleteDataSource</option>
+                <option value="batchCreateDataSources">batchCreateDataSources</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="params">参数 (JSON):</label>
+            <textarea id="params" rows="5" placeholder='{"platform": "firecrawl", "identifier": "https://example.com"}'></textarea>
+        </div>
+        
+        <button onclick="testAPI()">发送请求</button>
+        <button onclick="testCORS()">测试CORS</button>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function testAPI() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            const apiKey = document.getElementById('apiKey').value;
+            const method = document.getElementById('method').value;
+            const paramsText = document.getElementById('params').value;
+            
+            let params = {};
+            if (paramsText.trim()) {
+                try {
+                    params = JSON.parse(paramsText);
+                } catch (e) {
+                    showResult('参数JSON格式错误: ' + e.message, true);
+                    return;
+                }
+            }
+            
+            const requestBody = {
+                jsonrpc: '2.0',
+                method: method,
+                params: params,
+                id: Date.now()
+            };
+            
+            showResult('发送请求中...', false);
+            console.log('请求:', requestBody);
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                console.log('响应状态:', response.status);
+                console.log('响应头:', [...response.headers.entries()]);
+                
+                const data = await response.text();
+                console.log('响应数据:', data);
+                
+                let result = `状态码: ${response.status}\n\n`;
+                result += `响应头:\n${[...response.headers.entries()].map(([k,v]) => `${k}: ${v}`).join('\n')}\n\n`;
+                result += `响应体:\n${data}`;
+                
+                showResult(result, !response.ok);
+            } catch (error) {
+                console.error('请求失败:', error);
+                showResult(`请求失败: ${error.message}`, true);
+            }
+        }
+        
+        async function testCORS() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            
+            showResult('测试CORS预检请求...', false);
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Access-Control-Request-Method': 'POST',
+                        'Access-Control-Request-Headers': 'Content-Type, Authorization'
+                    }
+                });
+                
+                console.log('CORS响应状态:', response.status);
+                console.log('CORS响应头:', [...response.headers.entries()]);
+                
+                let result = `CORS预检请求状态码: ${response.status}\n\n`;
+                result += `CORS响应头:\n${[...response.headers.entries()].map(([k,v]) => `${k}: ${v}`).join('\n')}`;
+                
+                const corsHeaders = [
+                    'Access-Control-Allow-Origin',
+                    'Access-Control-Allow-Methods', 
+                    'Access-Control-Allow-Headers'
+                ];
+                
+                const missingHeaders = corsHeaders.filter(header => 
+                    !response.headers.has(header.toLowerCase())
+                );
+                
+                if (missingHeaders.length > 0) {
+                    result += `\n\n⚠️ 缺少CORS头: ${missingHeaders.join(', ')}`;
+                } else {
+                    result += '\n\n✅ CORS配置正常';
+                }
+                
+                showResult(result, response.status !== 200);
+            } catch (error) {
+                console.error('CORS测试失败:', error);
+                showResult(`CORS测试失败: ${error.message}`, true);
+            }
+        }
+        
+        function showResult(text, isError = false) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `<pre>${text}</pre>`;
+            resultDiv.className = 'result' + (isError ? ' error' : '');
+        }
+        
+        // 页面加载时的提示
+        window.onload = function() {
+            showResult('请输入API密钥，然后点击"发送请求"或"测试CORS"按钮', false);
+        };
+    </script>
+</body>
+</html>

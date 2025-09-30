@@ -363,7 +363,7 @@ export class WeixinArticleWorkflow
         await Promise.all(topContents.map(async (content) => {
           await this.processContent(content);
           await processProgress.render(++processCompleted, {
-            title: `已处理: ${content.title?.slice(0, 5) || "无标题"}...`,
+            title: `已处理: ${content.title ? content.title.slice(0, 5) : "无标题"}...`,
           });
         }));
 

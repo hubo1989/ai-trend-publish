@@ -1,0 +1,329 @@
+/* AI趋势发布系统 - shadcn风格样式 */
+
+/* CSS Variables - 白底黑色组件风格 */
+:root {
+  --radius: 0.5rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+}
+
+/* 基础样式重置 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: var(--background);
+  color: var(--foreground);
+  line-height: 1.5;
+}
+
+/* 自定义组件样式 */
+.shadcn-card {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.shadcn-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: none;
+  min-height: 2.25rem;
+  padding: 0.5rem 1rem;
+}
+
+.shadcn-button-primary {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.shadcn-button-primary:hover {
+  background-color: oklch(0.18 0 0);
+}
+
+.shadcn-button-secondary {
+  background-color: var(--secondary);
+  color: var(--secondary-foreground);
+  border: 1px solid var(--border);
+}
+
+.shadcn-button-secondary:hover {
+  background-color: oklch(0.95 0 0);
+}
+
+.shadcn-button-destructive {
+  background-color: var(--destructive);
+  color: var(--primary-foreground);
+}
+
+.shadcn-button-destructive:hover {
+  background-color: oklch(0.52 0.22 27);
+}
+
+.shadcn-input {
+  display: flex;
+  height: 2.25rem;
+  width: 100%;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background-color: var(--background);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  transition: border-color 0.2s ease;
+}
+
+.shadcn-input:focus {
+  outline: none;
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px rgba(113, 113, 122, 0.2);
+}
+
+.shadcn-select {
+  display: flex;
+  height: 2.25rem;
+  width: 100%;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background-color: var(--background);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.shadcn-select:focus {
+  outline: none;
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px rgba(113, 113, 122, 0.2);
+}
+
+.shadcn-textarea {
+  display: flex;
+  min-height: 4rem;
+  width: 100%;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background-color: var(--background);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  resize: vertical;
+}
+
+.shadcn-textarea:focus {
+  outline: none;
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px rgba(113, 113, 122, 0.2);
+}
+
+.shadcn-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--foreground);
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.shadcn-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  table-layout: fixed;
+}
+
+.shadcn-table th {
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+  font-weight: 500;
+  text-align: left;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.875rem;
+}
+
+.shadcn-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.875rem;
+}
+
+.shadcn-table tbody tr:hover {
+  background-color: var(--muted);
+}
+
+.shadcn-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* 状态徽章 */
+.shadcn-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: calc(var(--radius) - 2px);
+  padding: 0.125rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.shadcn-badge-default {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.shadcn-badge-secondary {
+  background-color: var(--secondary);
+  color: var(--secondary-foreground);
+}
+
+.shadcn-badge-success {
+  background-color: oklch(0.646 0.222 142);
+  color: white;
+}
+
+.shadcn-badge-warning {
+  background-color: oklch(0.828 0.189 84);
+  color: oklch(0.28 0.07 46);
+}
+
+.shadcn-badge-error {
+  background-color: var(--destructive);
+  color: var(--primary-foreground);
+}
+
+.shadcn-badge-success {
+  background-color: oklch(0.9 0.03 142);
+  color: oklch(0.3 0.15 142);
+  border: 1px solid oklch(0.8 0.05 142);
+}
+
+.shadcn-badge-info {
+  background-color: oklch(0.9 0.03 220);
+  color: oklch(0.3 0.15 220);
+  border: 1px solid oklch(0.8 0.05 220);
+}
+
+.shadcn-button-link {
+  background: none;
+  border: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: inherit;
+}
+
+.shadcn-button-link:hover {
+  background-color: var(--muted);
+}
+
+/* 日志面板特殊样式 */
+.log-panel {
+  background-color: oklch(0.98 0 0);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  min-height: 200px;
+}
+
+.log-entry {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid oklch(0.95 0 0);
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.log-entry:last-child {
+  border-bottom: none;
+}
+
+.log-entry.log-info {
+  color: oklch(0.6 0.118 184);
+}
+
+.log-entry.log-success {
+  color: oklch(0.646 0.222 142);
+}
+
+.log-entry.log-warning {
+  color: oklch(0.828 0.189 84);
+}
+
+.log-entry.log-error {
+  color: var(--destructive);
+}
+
+/* 版本号显示 */
+.version-display {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  z-index: 40;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .shadcn-button {
+    min-height: 2rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8rem;
+  }
+  
+  .shadcn-input, .shadcn-select {
+    height: 2rem;
+    font-size: 0.8rem;
+  }
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--muted);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ring);
+}

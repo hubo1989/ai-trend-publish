@@ -41,7 +41,7 @@ export class AliWanX21ImageGenerator extends BaseAliyunImageGenerator {
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         throw new Error(
-          `图片生成失败: ${error.response?.data?.message || error.message}`,
+          `图片生成失败: ${error.response && error.response.data && error.response.data.message ? error.response.data.message : error.message}`,
         );
       }
       throw error;

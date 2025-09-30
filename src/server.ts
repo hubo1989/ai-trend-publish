@@ -1,6 +1,13 @@
 import { triggerWorkflow } from "./controllers/workflow.controller.ts";
 import { WorkflowType } from "./controllers/cron.ts";
 import { ConfigManager } from "@src/utils/config/config-manager.ts";
+import { 
+  getDataSources, 
+  createDataSource, 
+  updateDataSource, 
+  deleteDataSource, 
+  batchCreateDataSources 
+} from "./api/data-sources.api.ts";
 
 
 export interface JSONRPCRequest {
@@ -36,22 +43,22 @@ export class JSONRPCServer {
   async handleRequest(request: Request): Promise<Response> {
     try {
       if (request.method !== "POST") {
-        throw new Error("只支持 POST 请求");
+        throw new Error("Only POST requests are supported");
       }
 
       const body = await request.json() as JSONRPCRequest;
 
       if (!body.jsonrpc || body.jsonrpc !== "2.0") {
-        throw new Error("无效的 JSON-RPC 请求");
+        throw new Error("Invalid JSON-RPC request");
       }
 
       if (!body.method) {
-        throw new Error("请求缺少方法名");
+        throw new Error("Missing method name");
       }
 
       const handler = this.routes[body.method];
       if (!handler) {
-        throw new Error(`方法 ${body.method} 不存在`);
+        throw new Error(`Method ${body.method} not found`);
       }
 
       const result = await handler(body.params || {});
@@ -66,14 +73,17 @@ export class JSONRPCServer {
           status: 200,
           headers: {
             "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
           },
         }
       );
     } catch (error) {
       const isClientError = error instanceof Error && (
-        error.message.includes("无效的") ||
-        error.message.includes("不存在") ||
-        error.message.includes("缺少")
+        error.message.includes("Invalid") ||
+        error.message.includes("not found") ||
+        error.message.includes("Missing")
       );
 
       return new Response(
@@ -81,7 +91,7 @@ export class JSONRPCServer {
           jsonrpc: "2.0",
           error: {
             code: isClientError ? -32600 : -32603,
-            message: isClientError ? error.message : "内部服务器错误",
+            message: isClientError ? error.message : "Internal server error",
             data: {
               error: error instanceof Error ? error.message : String(error),
             },
@@ -92,6 +102,9 @@ export class JSONRPCServer {
           status: isClientError ? 400 : 500,
           headers: {
             "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
           },
         }
       );
@@ -102,9 +115,30 @@ export class JSONRPCServer {
 // 创建 JSON-RPC 服务器实例
 const rpcServer = new JSONRPCServer();
 rpcServer.registerRoute("triggerWorkflow", triggerWorkflow);
+rpcServer.registerRoute("getDataSources", getDataSources);
+rpcServer.registerRoute("createDataSource", createDataSource);
+rpcServer.registerRoute("updateDataSource", updateDataSource);
+rpcServer.registerRoute("deleteDataSource", deleteDataSource);
+rpcServer.registerRoute("batchCreateDataSources", batchCreateDataSources);
+
+// CORS 头部设置
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Max-Age": "86400",
+};
 
 // 请求处理器
 const handler = async (req: Request): Promise<Response> => {
+  // 处理 OPTIONS 预检请求
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 200,
+      headers: corsHeaders,
+    });
+  }
+
   try {
     // 验证 Authorization 请求头
     const configManager = ConfigManager.getInstance();
@@ -117,9 +151,9 @@ const handler = async (req: Request): Promise<Response> => {
           jsonrpc: "2.0",
           error: {
             code: -32001,
-            message: "未授权的访问",
+            message: "Unauthorized access",
             data: {
-              error: "缺少有效的 Authorization 请求头"
+              error: "Missing valid Authorization header"
             }
           },
         }),
@@ -127,6 +161,7 @@ const handler = async (req: Request): Promise<Response> => {
           status: 401,
           headers: {
             "Content-Type": "application/json",
+            ...corsHeaders,
           }
         }
       );
@@ -148,7 +183,7 @@ const handler = async (req: Request): Promise<Response> => {
         jsonrpc: "2.0",
         error: {
           code: -32601,
-          message: "无效的API路径",
+          message: "Invalid API path",
           data: {
             path: normalizedPath,
             expectedPath: "api/workflow"
@@ -159,6 +194,7 @@ const handler = async (req: Request): Promise<Response> => {
         status: 404,
         headers: {
           "Content-Type": "application/json",
+          ...corsHeaders,
         }
       }
     );
@@ -169,7 +205,7 @@ const handler = async (req: Request): Promise<Response> => {
         jsonrpc: "2.0",
         error: {
           code: -32603,
-          message: "服务器内部错误",
+          message: "Internal server error",
           data: {
             error: error instanceof Error ? error.message : String(error)
           }
@@ -179,6 +215,7 @@ const handler = async (req: Request): Promise<Response> => {
         status: 500,
         headers: {
           "Content-Type": "application/json",
+          ...corsHeaders,
         }
       }
     );
@@ -190,5 +227,10 @@ export default function startServer(port = 8000) {
   console.log(`JSON-RPC 服务器运行在 http://localhost:${port}`);
   console.log("支持的方法:");
   console.log("- triggerWorkflow");
+  console.log("- getDataSources");
+  console.log("- createDataSource");
+  console.log("- updateDataSource");
+  console.log("- deleteDataSource");
+  console.log("- batchCreateDataSources");
   console.log(`可用的工作流类型: ${Object.values(WorkflowType).join(", ")}`);
 }

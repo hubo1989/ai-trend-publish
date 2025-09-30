@@ -1,0 +1,30 @@
+version: '3.8'
+services:
+  app:
+    build: .
+    image: ai-trend-publish
+    container_name: ai-trend-publish-container
+    env_file:
+      - .env
+    # Override DB_HOST to connect to the db service in the Docker network
+    environment:
+      - DB_HOST=db
+    restart: unless-stopped
+    depends_on:
+      - db
+
+  db:
+    image: mysql:8.0
+    container_name: ai-trend-publish-db
+    restart: unless-stopped
+    # Ensure these values match your .env file
+    environment:
+      MYSQL_DATABASE: trendfinder
+      MYSQL_ROOT_PASSWORD: password 
+    ports:
+      - "3306:3306"
+    volumes:
+      - ai-trend-publish-db-data:/var/lib/mysql
+
+volumes:
+  ai-trend-publish-db-data:

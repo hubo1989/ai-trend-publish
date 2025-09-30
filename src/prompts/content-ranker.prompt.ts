@@ -59,12 +59,15 @@ export function getSystemPrompt(): string {
 }
 
 export function getUserPrompt(contents: ScrapedContent[]): string {
-  return contents.map((content) => (
-    `文章ID: ${content.id}\n` +
-    `标题: ${content.title}\n` +
-    `发布时间: ${content.publishDate}\n` +
-    `内容:\n${content.content}\n` +
-    `图像: ${content.media?.map((m) => m.url).join(", ")}\n` +
-    `---\n`
-  )).join("\n");
+  return contents.map((content) => {
+    const mediaUrls = content.media ? content.media.map((m) => m.url).join(", ") : "";
+    return (
+      `文章ID: ${content.id}\n` +
+      `标题: ${content.title}\n` +
+      `发布时间: ${content.publishDate}\n` +
+      `内容:\n${content.content}\n` +
+      `图像: ${mediaUrls}\n` +
+      `---\n`
+    );
+  }).join("\n");
 }

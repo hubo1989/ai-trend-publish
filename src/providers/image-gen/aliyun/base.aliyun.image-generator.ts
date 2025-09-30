@@ -114,7 +114,7 @@ export abstract class BaseAliyunImageGenerator extends BaseImageGenerator {
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         throw new Error(
-          `任务状态检查失败: ${error.response?.data?.message || error.message}`,
+          `任务状态检查失败: ${error.response && error.response.data && error.response.data.message ? error.response.data.message : error.message}`,
         );
       }
       throw error;

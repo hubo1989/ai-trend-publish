@@ -15,11 +15,11 @@ export const getSummarizerSystemPrompt = (): string => {
     6. 生成一个0-100的分数，表示内容的重要性和价值，分数越高，表示内容越重要和有价值，同时越可能被读者关注，同时具有区分度，不应该分数很集中，精确到小数点后两位；
 
     请只返回JSON格式数据，格式如下：
-    {
-        "title": "专业的标题",
-        "content": "扩充和完善后的内容",
-        "keywords": ["关键词1", "关键词2", "关键词3"],
-    }`;
+    title: 专业的标题
+    content: 扩充和完善后的内容
+    keywords: 关键词数组
+    
+    注意：返回标准的JSON对象格式，包含title、content和keywords三个字段`;
 };
 
 export const getSummarizerUserPrompt = ({

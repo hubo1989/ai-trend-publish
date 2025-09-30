@@ -1,0 +1,1186 @@
+// AI趋势发布系统管理应用
+class DataSourceManager {
+    constructor() {
+        // 使用动态配置的API地址
+        this.apiUrl = window.CONFIG ? window.CONFIG.getApiUrl() : 'http://127.0.0.1:8000';
+        this.apiKey = '';
+        this.dataSources = [];
+        this.currentEditId = null;
+        this.logs = [];
+        
+        this.init();
+    }
+
+    init() {
+        this.bindEvents();
+        this.initializeTimeSelectors();
+        this.loadConfig();
+        this.checkApiKeyAndShowModal();
+    }
+
+    // 绑定事件
+    bindEvents() {
+        // 安全绑定事件的辅助函数
+        const safeAddEventListener = (id, event, handler) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.addEventListener(event, handler);
+            } else {
+                console.warn(`元素未找到: ${id}`);
+            }
+        };
+
+        // 配置相关
+        safeAddEventListener('testConnection', 'click', () => this.testConnection());
+        safeAddEventListener('apiUrl', 'change', (e) => this.updateConfig('apiUrl', e.target.value));
+        safeAddEventListener('apiKey', 'change', (e) => this.updateConfig('apiKey', e.target.value));
+
+        // 操作按钮
+        safeAddEventListener('addWebPageBtn', 'click', () => this.showWebPageModal());
+        safeAddEventListener('addTwitterBtn', 'click', () => this.showTwitterModal());
+        safeAddEventListener('batchAddBtn', 'click', () => this.showBatchModal());
+        safeAddEventListener('batchExportBtn', 'click', () => this.showExportModal());
+        
+        // 工作流配置按钮
+        safeAddEventListener('manualTriggerBtn', 'click', () => this.showTriggerModal());
+        safeAddEventListener('saveWorkflowConfig', 'click', () => this.saveWorkflowConfig());
+
+        // 日志相关
+        safeAddEventListener('clearLogs', 'click', () => this.clearLogs());
+
+        // 模态框关闭按钮
+        safeAddEventListener('closeWebPageModal', 'click', () => this.hideModal('webPageModal'));
+        safeAddEventListener('closeTwitterModal', 'click', () => this.hideModal('twitterModal'));
+        safeAddEventListener('closeTriggerModal', 'click', () => this.hideModal('triggerModal'));
+        safeAddEventListener('closeBatchModal', 'click', () => this.hideModal('batchModal'));
+        safeAddEventListener('closeConfirmModal', 'click', () => this.hideModal('confirmModal'));
+
+        // 模态框取消按钮
+        safeAddEventListener('cancelWebPageBtn', 'click', () => this.hideModal('webPageModal'));
+        safeAddEventListener('cancelTwitterBtn', 'click', () => this.hideModal('twitterModal'));
+        safeAddEventListener('cancelTriggerBtn', 'click', () => this.hideModal('triggerModal'));
+        safeAddEventListener('cancelBatchBtn', 'click', () => this.hideModal('batchModal'));
+        safeAddEventListener('cancelDeleteBtn', 'click', () => this.hideModal('confirmModal'));
+
+        // 表单提交
+        safeAddEventListener('webPageForm', 'submit', (e) => this.handleWebPageSubmit(e));
+        safeAddEventListener('twitterForm', 'submit', (e) => this.handleTwitterSubmit(e));
+        safeAddEventListener('triggerForm', 'submit', (e) => this.handleTriggerSubmit(e));
+        safeAddEventListener('batchForm', 'submit', (e) => this.handleBatchSubmit(e));
+        safeAddEventListener('confirmDeleteBtn', 'click', () => this.confirmDelete());
+        safeAddEventListener('apiKeyInitForm', 'submit', (e) => this.handleApiKeyInit(e));
+
+        // 点击模态框外部关闭
+        window.addEventListener('click', (e) => {
+            if (e.target.classList.contains('bg-black') && e.target.classList.contains('bg-opacity-50')) {
+                const modals = ['webPageModal', 'twitterModal', 'triggerModal', 'batchModal', 'confirmModal'];
+                modals.forEach(modalId => {
+                    if (e.target.id === modalId || e.target.closest(`#${modalId}`)) {
+                        this.hideModal(modalId);
+                    }
+                });
+            }
+        });
+
+        // 键盘事件
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const modals = ['webPageModal', 'twitterModal', 'triggerModal', 'batchModal', 'confirmModal'];
+                modals.forEach(modalId => {
+                    const modalEl = document.getElementById(modalId);
+                    if (modalEl && !modalEl.classList.contains('hidden')) {
+                        this.hideModal(modalId);
+                    }
+                });
+            }
+        });
+    }
+
+    // 初始化时间选择器
+    initializeTimeSelectors() {
+        const hourSelect = document.getElementById('scheduleHour');
+        const minuteSelect = document.getElementById('scheduleMinute');
+
+        // 初始化小时选项 (0-23)
+        if (hourSelect) {
+            for (let i = 0; i < 24; i++) {
+                const option = document.createElement('option');
+                option.value = i.toString().padStart(2, '0');
+                option.textContent = i.toString().padStart(2, '0') + ':00';
+                hourSelect.appendChild(option);
+            }
+        }
+
+        // 初始化分钟选项 (0, 15, 30, 45)
+        if (minuteSelect) {
+            const minutes = ['00', '15', '30', '45'];
+            minutes.forEach(minute => {
+                const option = document.createElement('option');
+                option.value = minute;
+                option.textContent = ':' + minute;
+                minuteSelect.appendChild(option);
+            });
+        }
+    }
+
+    // 日志管理
+    addLog(message, type = 'info') {
+        const timestamp = new Date().toLocaleTimeString();
+        const log = {
+            timestamp,
+            message,
+            type
+        };
+        
+        this.logs.unshift(log);
+        if (this.logs.length > 100) {
+            this.logs = this.logs.slice(0, 100);
+        }
+        
+        this.updateLogDisplay();
+        this.updateLastUpdate();
+    }
+
+    updateLogDisplay() {
+        const container = document.getElementById('logPanel');
+        if (!container) return;
+        
+        const html = this.logs.map(log => {
+            let indicatorColor, textColor;
+            switch (log.type) {
+                case 'success':
+                    indicatorColor = 'bg-green-500';
+                    textColor = 'text-green-700';
+                    break;
+                case 'error':
+                    indicatorColor = 'bg-red-500';
+                    textColor = 'text-red-700';
+                    break;
+                case 'warning':
+                    indicatorColor = 'bg-yellow-500';
+                    textColor = 'text-yellow-700';
+                    break;
+                default:
+                    indicatorColor = 'bg-blue-500';
+                    textColor = 'text-blue-700';
+            }
+            
+            return `
+                <div class="flex items-start p-3 border-b border-gray-200 hover:bg-gray-50">
+                    <div class="w-1 h-1 ${indicatorColor} rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-xs text-gray-500 mb-1">${log.timestamp}</div>
+                        <div class="text-sm ${textColor} break-words">${log.message}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        container.innerHTML = html || `
+            <div class="p-2 bg-blue-900 border border-blue-700 rounded text-blue-200">
+                <span class="font-mono text-xs text-gray-400">[${new Date().toLocaleTimeString()}]</span>
+                <span class="ml-1">系统已启动，等待任务执行...</span>
+            </div>
+        `;
+    }
+
+    updateLastUpdate() {
+        const lastUpdateEl = document.getElementById('lastUpdate');
+        if (lastUpdateEl) {
+            lastUpdateEl.textContent = '刚刚';
+        }
+    }
+
+    clearLogs() {
+        this.logs = [];
+        this.updateLogDisplay();
+        this.addLog('日志已清空');
+    }
+
+    startLogUpdates() {
+        // 模拟日志更新
+        setInterval(() => {
+            const randomMessages = [
+                '检查数据源状态...',
+                '处理队列任务...',
+                '同步数据源信息...',
+                '执行定时任务检查...'
+            ];
+            
+            if (Math.random() > 0.7) { // 30% 概率添加日志
+                const message = randomMessages[Math.floor(Math.random() * randomMessages.length)];
+                this.addLog(message);
+            }
+        }, 30000); // 每30秒检查一次
+    }
+
+    // 检查API key并显示初始化弹窗
+    checkApiKeyAndShowModal() {
+        const savedApiKey = localStorage.getItem('apiKey');
+        if (!savedApiKey) {
+            // 没有API key，显示初始化弹窗
+            this.showApiKeyInitModal();
+        } else {
+            // 有API key，继续正常初始化
+            this.completeInitialization();
+        }
+    }
+
+    // 显示API key初始化弹窗
+    showApiKeyInitModal() {
+        const modal = document.getElementById('apiKeyInitModal');
+        const initApiUrlEl = document.getElementById('initApiUrl');
+        
+        if (modal) {
+            modal.classList.remove('hidden');
+            // 设置默认API地址
+            if (initApiUrlEl) {
+                initApiUrlEl.value = this.apiUrl;
+            }
+        }
+    }
+
+    // 隐藏API key初始化弹窗
+    hideApiKeyInitModal() {
+        const modal = document.getElementById('apiKeyInitModal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+
+    // 处理API key初始化表单提交
+    handleApiKeyInit(e) {
+        e.preventDefault();
+        
+        const initApiUrlEl = document.getElementById('initApiUrl');
+        const initApiKeyEl = document.getElementById('initApiKey');
+        
+        if (!initApiUrlEl || !initApiKeyEl) {
+            alert('表单元素未找到');
+            return;
+        }
+        
+        const apiUrl = initApiUrlEl.value.trim();
+        const apiKey = initApiKeyEl.value.trim();
+        
+        if (!apiUrl) {
+            alert('请输入API地址');
+            return;
+        }
+        
+        if (!apiKey) {
+            alert('请输入API密钥');
+            return;
+        }
+        
+        // 保存配置
+        this.apiUrl = apiUrl;
+        this.apiKey = apiKey;
+        localStorage.setItem('apiUrl', apiUrl);
+        localStorage.setItem('apiKey', apiKey);
+        
+        // 更新页面配置显示
+        const pageApiUrlEl = document.getElementById('apiUrl');
+        const pageApiKeyEl = document.getElementById('apiKey');
+        if (pageApiUrlEl) pageApiUrlEl.value = apiUrl;
+        if (pageApiKeyEl) pageApiKeyEl.value = apiKey;
+        
+        // 隐藏弹窗并完成初始化
+        this.hideApiKeyInitModal();
+        this.completeInitialization();
+    }
+
+    // 完成系统初始化
+    completeInitialization() {
+        this.loadWorkflowConfig();
+        this.loadDataSources();
+        this.startLogUpdates();
+        this.addLog('系统初始化完成', 'success');
+    }
+
+    // 加载配置
+    loadConfig() {
+        // 加载保存的API配置，如果没有则使用默认值
+        const savedApiUrl = localStorage.getItem('apiUrl');
+        const savedApiKey = localStorage.getItem('apiKey');
+        
+        if (savedApiUrl) {
+            this.apiUrl = savedApiUrl;
+        }
+        
+        // 更新UI元素
+        const apiUrlEl = document.getElementById('apiUrl');
+        if (apiUrlEl) {
+            apiUrlEl.value = this.apiUrl;
+        }
+        
+        // 始终加载保存的API key，即使为空
+        if (savedApiKey) {
+            this.apiKey = savedApiKey;
+            const apiKeyEl = document.getElementById('apiKey');
+            if (apiKeyEl) {
+                apiKeyEl.value = savedApiKey;
+            }
+        }
+        
+        // 记录加载的配置
+        this.addLog(`API配置已加载: ${this.apiUrl}`, 'info');
+        if (this.apiKey) {
+            this.addLog('API密钥已从缓存加载', 'success');
+        } else {
+            this.addLog('未找到缓存的API密钥，请配置', 'warning');
+        }
+    }
+
+    // 更新配置
+    updateConfig(key, value) {
+        if (key === 'apiUrl') {
+            this.apiUrl = value;
+            localStorage.setItem(key, value);
+            this.addLog(`API地址已更新: ${value}`, 'info');
+        } else if (key === 'apiKey') {
+            this.apiKey = value;
+        localStorage.setItem(key, value);
+            if (value) {
+                this.addLog('API密钥已保存到本地缓存', 'success');
+            } else {
+                this.addLog('API密钥已清空', 'warning');
+            }
+        }
+    }
+
+    // 加载工作流配置
+    loadWorkflowConfig() {
+        const scheduleTime = localStorage.getItem('scheduleTime') || '09:00';
+        const workflowType = localStorage.getItem('workflowType') || 'weixin-article-workflow';
+        const enableSchedule = localStorage.getItem('enableSchedule') !== 'false';
+
+        // 解析时间并设置小时和分钟选择器
+        const [hour, minute] = scheduleTime.split(':');
+        const scheduleHourEl = document.getElementById('scheduleHour');
+        const scheduleMinuteEl = document.getElementById('scheduleMinute');
+        const workflowTypeEl = document.getElementById('workflowType');
+        const enableScheduleEl = document.getElementById('enableSchedule');
+
+        if (scheduleHourEl) scheduleHourEl.value = hour || '09';
+        if (scheduleMinuteEl) scheduleMinuteEl.value = minute || '00';
+        if (workflowTypeEl) workflowTypeEl.value = workflowType;
+        if (enableScheduleEl) enableScheduleEl.checked = enableSchedule;
+    }
+
+    // 保存工作流配置
+    saveWorkflowConfig() {
+        const scheduleHourEl = document.getElementById('scheduleHour');
+        const scheduleMinuteEl = document.getElementById('scheduleMinute');
+        const workflowTypeEl = document.getElementById('workflowType');
+        const enableScheduleEl = document.getElementById('enableSchedule');
+
+        if (!scheduleHourEl || !scheduleMinuteEl || !workflowTypeEl || !enableScheduleEl) {
+            this.showMessage('配置元素未找到', 'error');
+            return;
+        }
+
+        const scheduleTime = `${scheduleHourEl.value}:${scheduleMinuteEl.value}`;
+        const workflowType = workflowTypeEl.value;
+        const enableSchedule = enableScheduleEl.checked;
+
+        localStorage.setItem('scheduleTime', scheduleTime);
+        localStorage.setItem('workflowType', workflowType);
+        localStorage.setItem('enableSchedule', enableSchedule);
+
+        this.showMessage('工作流配置保存成功', 'success');
+        this.addLog(`工作流配置已保存: ${workflowType}, 触发时间: ${scheduleTime}`, 'success');
+    }
+
+    // 测试连接
+    async testConnection() {
+        this.addLog('正在测试API连接...');
+        try {
+            const result = await this.makeRequest('getDataSources', {});
+            if (result && result.success) {
+                this.showMessage('连接测试成功', 'success');
+                this.addLog('API连接测试成功', 'success');
+                
+                // 连接成功后自动刷新数据源数据
+                this.addLog('正在刷新数据源数据...', 'info');
+                this.dataSources = result.data || [];
+                this.renderDataSources();
+                this.updateStats();
+                this.addLog(`成功加载 ${this.dataSources.length} 个数据源`, 'success');
+            } else {
+                throw new Error('连接失败');
+            }
+        } catch (error) {
+            this.showMessage('连接测试失败: ' + error.message, 'error');
+            this.addLog('API连接测试失败: ' + error.message, 'error');
+        }
+    }
+
+    // 发起API请求
+    async makeRequest(method, params) {
+        // 检查API配置
+        if (!this.apiUrl) {
+            throw new Error('API地址未配置');
+        }
+        
+        if (!this.apiKey) {
+            throw new Error('API密钥未配置，请在配置中设置API密钥');
+        }
+
+        try {
+            this.addLog(`发起API请求: ${method}`, 'info');
+            
+            const response = await fetch(this.apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.apiKey}`
+                },
+                body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    method: method,
+                    params: params,
+                    id: Date.now()
+                })
+            });
+
+            if (response.status === 401) {
+                this.addLog('API密钥无效或已过期，请检查配置', 'error');
+                throw new Error('API密钥无效或已过期，请检查API密钥配置');
+            }
+
+            if (!response.ok) {
+                this.addLog(`API请求失败: HTTP ${response.status}`, 'error');
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            
+            if (data.error) {
+                this.addLog(`API返回错误: ${data.error.message}`, 'error');
+                throw new Error(data.error.message || '请求失败');
+            }
+
+            this.addLog(`API请求成功: ${method}`, 'success');
+            return data.result;
+        } catch (error) {
+            console.error('API请求失败:', error);
+            this.addLog(`API请求异常: ${error.message}`, 'error');
+            throw error;
+        }
+    }
+
+    // 加载数据源列表
+    async loadDataSources() {
+        this.addLog('正在加载数据源列表...');
+        try {
+            this.showLoading();
+            const result = await this.makeRequest('getDataSources', {});
+            
+            if (result && result.success && result.data) {
+                this.dataSources = result.data;
+                this.renderDataSources();
+                this.updateStats();
+                this.addLog(`成功加载 ${this.dataSources.length} 个数据源`, 'success');
+            } else {
+                throw new Error('获取数据源失败');
+            }
+        } catch (error) {
+            this.showMessage('加载数据源失败: ' + error.message, 'error');
+            this.addLog('加载数据源失败: ' + error.message, 'error');
+            this.dataSources = [];
+            this.renderDataSources();
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    // 渲染数据源列表
+    renderDataSources() {
+        const tbody = document.getElementById('dataSourcesTable');
+        const emptyState = document.getElementById('emptyState');
+
+        if (this.dataSources.length === 0) {
+            tbody.innerHTML = '';
+            emptyState.classList.remove('hidden');
+            return;
+        }
+
+        emptyState.classList.add('hidden');
+
+        tbody.innerHTML = this.dataSources.map((source, index) => `
+            <tr>
+                <td class="text-center">${index + 1}</td>
+                <td>
+                    <span class="shadcn-badge ${
+                        source.platform === 'firecrawl' ? 'shadcn-badge-success' : 'shadcn-badge-info'
+                    }">
+                        ${source.platform === 'firecrawl' ? '🌐 网页' : '🐦 Twitter'}
+                    </span>
+                </td>
+                <td class="max-w-xs truncate" title="${this.formatIdentifier(source)}">${this.formatIdentifier(source)}</td>
+                <td>
+                    <div class="flex items-center space-x-2 whitespace-nowrap">
+                        <button onclick="app.editDataSource(${source.id})" class="shadcn-button-link text-blue-600 hover:text-blue-800 text-sm px-2 py-1 flex-shrink-0">
+                            编辑
+                        </button>
+                        <button onclick="app.deleteDataSource(${source.id})" class="shadcn-button-link text-red-600 hover:text-red-800 text-sm px-2 py-1 flex-shrink-0">
+                            删除
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    // 格式化显示标识符
+    formatIdentifier(source) {
+        if (source.platform === 'twitter') {
+            // 如果是URL格式，提取用户名并添加@符号
+            let identifier = source.identifier;
+            if (identifier.includes('x.com/') || identifier.includes('twitter.com/')) {
+                identifier = identifier.split('/').pop();
+            }
+            return identifier.startsWith('@') ? identifier : '@' + identifier;
+        }
+        return source.identifier;
+    }
+
+    // 格式化日期显示
+    formatDate(dateString) {
+        try {
+            if (!dateString || dateString === 'null' || dateString === 'undefined') {
+                return '未知';
+            }
+            
+            // 调试日志
+            console.log('格式化日期:', dateString, typeof dateString);
+            
+            let date;
+            
+            // 如果是数字（时间戳）
+            if (typeof dateString === 'number' || /^\d+$/.test(dateString)) {
+                const timestamp = parseInt(dateString);
+                // 检查是否是秒级时间戳（需要转换为毫秒）
+                date = timestamp < 10000000000 ? new Date(timestamp * 1000) : new Date(timestamp);
+            } else {
+                // 字符串格式处理
+                let dateStr = String(dateString).trim();
+                
+                // 尝试直接解析
+                date = new Date(dateStr);
+                
+                // 如果无效，尝试其他格式
+                if (isNaN(date.getTime())) {
+                    // 尝试替换空格为T（ISO格式）
+                    date = new Date(dateStr.replace(' ', 'T'));
+                }
+                
+                // 如果还是无效，尝试添加时区
+                if (isNaN(date.getTime())) {
+                    date = new Date(dateStr + 'Z');
+                }
+                
+                // 如果还是无效，尝试解析MySQL格式
+                if (isNaN(date.getTime())) {
+                    const mysqlMatch = dateStr.match(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
+                    if (mysqlMatch) {
+                        date = new Date(mysqlMatch[1], mysqlMatch[2] - 1, mysqlMatch[3], mysqlMatch[4], mysqlMatch[5], mysqlMatch[6]);
+                    }
+                }
+            }
+            
+            // 最终检查
+            if (!date || isNaN(date.getTime())) {
+                console.warn('无法解析日期:', dateString);
+                return String(dateString);
+            }
+            
+            // 返回本地化的日期时间字符串
+            const formatted = date.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+            
+            console.log('格式化结果:', formatted);
+            return formatted;
+            
+        } catch (error) {
+            console.error('日期格式化错误:', error, dateString);
+            return String(dateString) || '未知';
+        }
+    }
+
+    // 更新统计信息
+    updateStats() {
+        const totalCount = this.dataSources.length;
+        const activeCount = this.dataSources.filter(s => s.status === 'active').length || totalCount;
+
+        const totalCountEl = document.getElementById('totalSources');
+        const activeCountEl = document.getElementById('activeSources');
+
+        if (totalCountEl) totalCountEl.textContent = totalCount;
+        if (activeCountEl) activeCountEl.textContent = activeCount;
+    }
+
+    // 显示模态框
+    showModal(modalId) {
+        const modalEl = document.getElementById(modalId);
+        if (modalEl) {
+            modalEl.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        } else {
+            console.warn(`模态框未找到: ${modalId}`);
+        }
+    }
+
+    // 隐藏模态框
+    hideModal(modalId) {
+        const modalEl = document.getElementById(modalId);
+        if (modalEl) {
+            modalEl.classList.add('hidden');
+            document.body.style.overflow = 'auto';
+        } else {
+            console.warn(`模态框未找到: ${modalId}`);
+        }
+    }
+
+    // 显示网页模态框
+    showWebPageModal() {
+        this.currentEditId = null;
+        const webPageFormEl = document.getElementById('webPageForm');
+        const webPageIdEl = document.getElementById('webPageId');
+        
+        if (webPageFormEl) webPageFormEl.reset();
+        if (webPageIdEl) webPageIdEl.value = '';
+        this.showModal('webPageModal');
+    }
+
+    // 显示Twitter模态框
+    showTwitterModal() {
+        this.currentEditId = null;
+        const twitterFormEl = document.getElementById('twitterForm');
+        const twitterIdEl = document.getElementById('twitterId');
+        
+        if (twitterFormEl) twitterFormEl.reset();
+        if (twitterIdEl) twitterIdEl.value = '';
+        this.showModal('twitterModal');
+    }
+
+    // 显示触发模态框
+    showTriggerModal() {
+        const triggerFormEl = document.getElementById('triggerForm');
+        const workflowTypeEl = document.getElementById('workflowType');
+        const triggerWorkflowTypeEl = document.getElementById('triggerWorkflowType');
+        
+        if (triggerFormEl) triggerFormEl.reset();
+        if (workflowTypeEl && triggerWorkflowTypeEl) {
+            triggerWorkflowTypeEl.value = workflowTypeEl.value;
+        }
+        this.showModal('triggerModal');
+    }
+
+    // 显示批量添加模态框
+    showBatchModal() {
+        const batchFormEl = document.getElementById('batchForm');
+        if (batchFormEl) batchFormEl.reset();
+        this.showModal('batchModal');
+    }
+
+    // 显示导出模态框
+    async showExportModal() {
+        if (!this.dataSources || this.dataSources.length === 0) {
+            this.showMessage('没有数据源可导出', 'warning');
+            return;
+        }
+
+        try {
+            // 生成批量添加格式的文本
+            const exportLines = this.dataSources.map(source => {
+                let identifier = source.identifier;
+                
+                // 对于Twitter数据源，如果是URL格式，转换为用户名格式
+                if (source.platform === 'twitter') {
+                    if (identifier.includes('x.com/') || identifier.includes('twitter.com/')) {
+                        identifier = '@' + identifier.split('/').pop();
+                    } else if (!identifier.startsWith('@')) {
+                        identifier = '@' + identifier;
+                    }
+                }
+                
+                return `${source.platform},${identifier}`;
+            });
+
+            const exportText = exportLines.join('\n');
+            console.log('生成的导出文本:', exportText);
+
+            // 检查剪贴板API是否可用
+            if (navigator.clipboard && window.isSecureContext) {
+                // 使用现代剪贴板API
+                await navigator.clipboard.writeText(exportText);
+                console.log('使用现代剪贴板API成功');
+            } else {
+                // 使用传统方法
+                console.log('使用传统剪贴板方法');
+                const textArea = document.createElement('textarea');
+                textArea.value = exportText;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-999999px';
+                textArea.style.top = '-999999px';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                if (!successful) {
+                    throw new Error('传统复制方法失败');
+                }
+            }
+            
+            this.showMessage(`已导出 ${this.dataSources.length} 个数据源到剪贴板`, 'success');
+            this.addLog(`批量导出成功: ${this.dataSources.length} 个数据源已复制到剪贴板`, 'success');
+            this.addLog('提示: 可以直接粘贴到批量添加窗口中', 'info');
+
+        } catch (error) {
+            console.error('导出失败:', error);
+            this.showMessage(`导出失败: ${error.message}`, 'error');
+            this.addLog(`导出失败: ${error.message}`, 'error');
+            
+            // 显示导出内容供手动复制
+            if (this.dataSources.length > 0) {
+                const exportLines = this.dataSources.map(source => {
+                    let identifier = source.identifier;
+                    if (source.platform === 'twitter') {
+                        if (identifier.includes('x.com/') || identifier.includes('twitter.com/')) {
+                            identifier = '@' + identifier.split('/').pop();
+                        } else if (!identifier.startsWith('@')) {
+                            identifier = '@' + identifier;
+                        }
+                    }
+                    return `${source.platform},${identifier}`;
+                });
+                
+                const exportText = exportLines.join('\n');
+                console.log('请手动复制以下内容:', exportText);
+                this.addLog('请手动复制以下内容到批量添加中:', 'warning');
+                this.addLog(exportText, 'info');
+            }
+        }
+    }
+
+    // 编辑数据源
+    editDataSource(id) {
+        const source = this.dataSources.find(s => s.id === id);
+        if (!source) return;
+
+        this.currentEditId = id;
+        
+        if (source.platform === 'firecrawl') {
+            const webPageIdEl = document.getElementById('webPageId');
+            const webPageUrlEl = document.getElementById('webPageUrl');
+            if (webPageIdEl) webPageIdEl.value = id;
+            if (webPageUrlEl) webPageUrlEl.value = source.identifier;
+            this.showModal('webPageModal');
+        } else if (source.platform === 'twitter') {
+            const twitterIdEl = document.getElementById('twitterId');
+            const twitterUsernameEl = document.getElementById('twitterUsername');
+            if (twitterIdEl) twitterIdEl.value = id;
+            if (twitterUsernameEl) {
+                // 如果identifier是URL格式，提取用户名
+                let displayUsername = source.identifier;
+                if (displayUsername.includes('x.com/') || displayUsername.includes('twitter.com/')) {
+                    displayUsername = displayUsername.split('/').pop();
+                }
+                // 如果不是以@开头，添加@
+                if (!displayUsername.startsWith('@')) {
+                    displayUsername = '@' + displayUsername;
+                }
+                twitterUsernameEl.value = displayUsername;
+            }
+            this.showModal('twitterModal');
+        }
+    }
+
+    // 删除数据源
+    deleteDataSource(id) {
+        const source = this.dataSources.find(s => s.id === id);
+        if (!source) return;
+
+        const confirmPlatformEl = document.getElementById('confirmPlatform');
+        const confirmIdentifierEl = document.getElementById('confirmIdentifier');
+        const confirmDeleteBtnEl = document.getElementById('confirmDeleteBtn');
+
+        if (confirmPlatformEl) confirmPlatformEl.textContent = source.platform;
+        if (confirmIdentifierEl) confirmIdentifierEl.textContent = source.identifier;
+        if (confirmDeleteBtnEl) confirmDeleteBtnEl.setAttribute('data-id', id);
+        
+        this.showModal('confirmModal');
+    }
+
+    // 确认删除
+    async confirmDelete() {
+        const confirmDeleteBtnEl = document.getElementById('confirmDeleteBtn');
+        if (!confirmDeleteBtnEl) {
+            console.error('confirmDeleteBtn元素未找到');
+            return;
+        }
+        const id = parseInt(confirmDeleteBtnEl.getAttribute('data-id'));
+        
+        this.hideModal('confirmModal');
+        this.showLoading();
+        this.addLog(`正在删除数据源 ID: ${id}...`);
+        
+        try {
+            const result = await this.makeRequest('deleteDataSource', { id });
+            if (result && result.success) {
+                this.showMessage('数据源删除成功', 'success');
+                this.addLog(`数据源 ID: ${id} 删除成功`, 'success');
+                this.loadDataSources();
+            } else {
+                throw new Error('删除失败');
+            }
+        } catch (error) {
+            this.showMessage('删除失败: ' + error.message, 'error');
+            this.addLog(`删除数据源失败: ${error.message}`, 'error');
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    // 处理网页表单提交
+    async handleWebPageSubmit(e) {
+        e.preventDefault();
+        
+        const webPageUrlEl = document.getElementById('webPageUrl');
+        const webPageIdEl = document.getElementById('webPageId');
+
+        if (!webPageUrlEl || !webPageIdEl) {
+            this.showMessage('表单元素未找到', 'error');
+            return;
+        }
+
+        const url = webPageUrlEl.value;
+        const id = webPageIdEl.value;
+
+        if (!url) {
+            this.showMessage('请输入网页地址', 'warning');
+            return;
+        }
+
+        this.hideModal('webPageModal');
+        this.showLoading();
+        this.addLog(`正在${id ? '更新' : '添加'}网页数据源: ${url}...`);
+
+        try {
+            let result;
+            if (id) {
+                result = await this.makeRequest('updateDataSource', {
+                    id: parseInt(id),
+                    platform: 'firecrawl',
+                    identifier: url
+                });
+            } else {
+                result = await this.makeRequest('createDataSource', {
+                    platform: 'firecrawl',
+                    identifier: url
+                });
+            }
+
+            if (result && result.success) {
+                this.showMessage(id ? '网页数据源更新成功' : '网页数据源添加成功', 'success');
+                this.addLog(`网页数据源${id ? '更新' : '添加'}成功: ${url}`, 'success');
+                this.loadDataSources();
+            } else {
+                throw new Error(id ? '更新失败' : '添加失败');
+            }
+        } catch (error) {
+            this.showMessage(`操作失败: ${error.message}`, 'error');
+            this.addLog(`网页数据源操作失败: ${error.message}`, 'error');
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    // 处理Twitter表单提交
+    async handleTwitterSubmit(e) {
+        e.preventDefault();
+        
+        const twitterUsernameEl = document.getElementById('twitterUsername');
+        const twitterIdEl = document.getElementById('twitterId');
+        
+        if (!twitterUsernameEl || !twitterIdEl) {
+            this.showMessage('表单元素未找到', 'error');
+            return;
+        }
+        
+        const username = twitterUsernameEl.value;
+        const id = twitterIdEl.value;
+
+        if (!username) {
+            this.showMessage('请输入X用户名', 'warning');
+            return;
+        }
+
+        // 规范化用户名格式，转换为Twitter URL格式
+        let normalizedUsername = username;
+        if (normalizedUsername.startsWith('@')) {
+            normalizedUsername = normalizedUsername.substring(1);
+        }
+        // 转换为Twitter URL格式
+        const twitterUrl = `https://x.com/${normalizedUsername}`;
+
+        this.hideModal('twitterModal');
+        this.showLoading();
+        this.addLog(`正在${id ? '更新' : '添加'}X关注: @${normalizedUsername}...`);
+
+        try {
+            let result;
+            if (id) {
+                result = await this.makeRequest('updateDataSource', {
+                    id: parseInt(id),
+                    platform: 'twitter',
+                    identifier: twitterUrl
+                });
+            } else {
+                result = await this.makeRequest('createDataSource', {
+                    platform: 'twitter',
+                    identifier: twitterUrl
+                });
+            }
+
+            if (result && result.success) {
+                this.showMessage(id ? 'X关注更新成功' : 'X关注添加成功', 'success');
+                this.addLog(`X关注${id ? '更新' : '添加'}成功: @${normalizedUsername}`, 'success');
+                this.loadDataSources();
+            } else {
+                throw new Error(id ? '更新失败' : '添加失败');
+            }
+        } catch (error) {
+            this.showMessage(`操作失败: ${error.message}`, 'error');
+            this.addLog(`X关注操作失败: ${error.message}`, 'error');
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    // 处理触发表单提交
+    async handleTriggerSubmit(e) {
+        e.preventDefault();
+        
+        const triggerWorkflowTypeEl = document.getElementById('triggerWorkflowType');
+        if (!triggerWorkflowTypeEl) {
+            this.showMessage('工作流类型元素未找到', 'error');
+            return;
+        }
+        
+        const workflowType = triggerWorkflowTypeEl.value;
+
+        if (!workflowType) {
+            this.showMessage('请选择工作流类型', 'warning');
+            return;
+        }
+
+        this.hideModal('triggerModal');
+        this.showLoading();
+        this.addLog(`正在手动触发工作流: ${workflowType}...`);
+
+        try {
+            this.addLog(`调试: 准备发送触发请求...`, 'info');
+            const result = await this.makeRequest('triggerWorkflow', {
+                workflowType: workflowType
+            });
+
+            this.addLog(`调试: API响应结果: ${JSON.stringify(result)}`, 'info');
+            
+            // 改进的成功判断逻辑：
+            // 1. 如果API调用成功（没有抛出异常），就认为触发成功
+            // 2. 因为工作流是异步执行的，API返回只是表示触发成功，不是执行结果
+            this.showMessage('工作流触发成功', 'success');
+            this.addLog(`工作流触发成功: ${workflowType}，请查看后台日志了解详细进度`, 'success');
+            this.addLog('提示: 工作流正在后台异步执行，可能需要几分钟时间完成', 'info');
+            this.addLog('如果看到后台日志中出现"获取所有数据源的响应"等信息，说明工作流已开始执行', 'info');
+            
+        } catch (error) {
+            this.addLog(`调试: 捕获到错误: ${error.message}`, 'error');
+            
+            // 特殊处理：如果是HTTP 200但内容解析错误，也可能是成功的
+            if (error.message.includes('Unexpected token') || 
+                error.message.includes('JSON') ||
+                error.message.includes('SyntaxError')) {
+                
+                this.showMessage('工作流可能已触发成功（响应格式异常）', 'warning');
+                this.addLog('API响应格式异常，但工作流可能已成功触发', 'warning');
+                this.addLog('请检查后台日志确认工作流是否开始执行', 'info');
+                
+            } else if (error.message.includes('HTTP') || error.message.includes('fetch') || error.message.includes('网络')) {
+                this.showMessage(`网络错误: ${error.message}`, 'error');
+                this.addLog(`网络连接失败: ${error.message}`, 'error');
+            } else {
+                this.showMessage(`工作流触发失败: ${error.message}`, 'error');
+                this.addLog(`工作流触发失败: ${error.message}`, 'error');
+            }
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    // 处理批量添加
+    async handleBatchSubmit(e) {
+        e.preventDefault();
+        
+        const batchDataEl = document.getElementById('batchContent');
+        if (!batchDataEl) {
+            this.showMessage('批量数据元素未找到', 'error');
+            return;
+        }
+        
+        const batchData = batchDataEl.value.trim();
+        
+        if (!batchData) {
+            this.showMessage('请输入数据源列表', 'warning');
+            return;
+        }
+
+        const lines = batchData.split('\n').filter(line => line.trim());
+        const dataSources = [];
+
+        for (const line of lines) {
+            const [platform, identifier] = line.split(',').map(s => s.trim());
+            
+            if (!platform || !identifier) {
+                this.showMessage('数据格式错误，请检查输入格式', 'error');
+                return;
+            }
+
+            if (!['firecrawl', 'twitter'].includes(platform)) {
+                this.showMessage(`不支持的平台类型: ${platform}`, 'error');
+                return;
+            }
+
+            // 处理Twitter数据源格式
+            let processedIdentifier = identifier;
+            if (platform === 'twitter') {
+                // 如果是用户名格式，转换为URL格式
+                if (!identifier.startsWith('http')) {
+                    let username = identifier;
+                    if (username.startsWith('@')) {
+                        username = username.substring(1);
+                    }
+                    processedIdentifier = `https://x.com/${username}`;
+                }
+            }
+
+            dataSources.push({ platform, identifier: processedIdentifier });
+        }
+
+        this.hideModal('batchModal');
+        this.showLoading();
+        this.addLog(`正在批量添加 ${dataSources.length} 个数据源...`);
+
+        try {
+            const result = await this.makeRequest('batchCreateDataSources', { dataSources });
+            
+            if (result && result.success) {
+                this.showMessage(`批量添加成功，共添加 ${dataSources.length} 个数据源`, 'success');
+                this.addLog(`批量添加成功: ${dataSources.length} 个数据源`, 'success');
+                this.loadDataSources();
+            } else {
+                throw new Error('批量添加失败');
+            }
+        } catch (error) {
+            this.showMessage('批量添加失败: ' + error.message, 'error');
+            this.addLog(`批量添加失败: ${error.message}`, 'error');
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    // 显示消息
+    showMessage(message, type = 'info') {
+        const container = document.getElementById('messageContainer');
+        if (!container) {
+            console.warn('messageContainer元素未找到，消息:', message);
+            return;
+        }
+        const messageId = 'msg-' + Date.now();
+        
+        let bgColor, textColor;
+        switch (type) {
+            case 'success':
+                bgColor = 'bg-green-500';
+                textColor = 'text-white';
+                break;
+            case 'error':
+                bgColor = 'bg-red-500';
+                textColor = 'text-white';
+                break;
+            case 'warning':
+                bgColor = 'bg-yellow-500';
+                textColor = 'text-white';
+                break;
+            default:
+                bgColor = 'bg-blue-500';
+                textColor = 'text-white';
+        }
+        
+        const messageElement = document.createElement('div');
+        messageElement.id = messageId;
+        messageElement.className = `${bgColor} ${textColor} px-4 py-3 rounded-lg shadow-lg mb-2 transform transition-all duration-300 translate-x-full`;
+        messageElement.innerHTML = `
+            <div class="flex items-center justify-between">
+                <span>${message}</span>
+                <button onclick="this.parentElement.parentElement.remove()" class="ml-3 text-white hover:text-gray-200">
+                    ×
+                </button>
+            </div>
+        `;
+        
+        container.appendChild(messageElement);
+        
+        // 动画显示
+        setTimeout(() => {
+            messageElement.classList.remove('translate-x-full');
+        }, 100);
+
+        // 自动消失
+            setTimeout(() => {
+            if (document.getElementById(messageId)) {
+                messageElement.classList.add('translate-x-full');
+            setTimeout(() => {
+                    if (messageElement.parentElement) {
+                messageElement.remove();
+                    }
+            }, 300);
+        }
+        }, 3000);
+    }
+
+    // 显示加载状态
+    showLoading() {
+        const loadingOverlayEl = document.getElementById('loadingOverlay');
+        if (loadingOverlayEl) {
+            loadingOverlayEl.classList.remove('hidden');
+        }
+    }
+
+    // 隐藏加载状态
+    hideLoading() {
+        const loadingOverlayEl = document.getElementById('loadingOverlay');
+        if (loadingOverlayEl) {
+            loadingOverlayEl.classList.add('hidden');
+        }
+    }
+}
+
+// 初始化应用
+let app;
+document.addEventListener('DOMContentLoaded', () => {
+    app = new DataSourceManager();
+});

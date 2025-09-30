@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI趋势发布系统</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="../docs/images/main.ico" type="image/x-icon">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        background: 'var(--background)',
+                        foreground: 'var(--foreground)',
+                        card: 'var(--card)',
+                        'card-foreground': 'var(--card-foreground)',
+                        popover: 'var(--popover)',
+                        'popover-foreground': 'var(--popover-foreground)',
+                        primary: 'var(--primary)',
+                        'primary-foreground': 'var(--primary-foreground)',
+                        secondary: 'var(--secondary)',
+                        'secondary-foreground': 'var(--secondary-foreground)',
+                        muted: 'var(--muted)',
+                        'muted-foreground': 'var(--muted-foreground)',
+                        accent: 'var(--accent)',
+                        'accent-foreground': 'var(--accent-foreground)',
+                        destructive: 'var(--destructive)',
+                        border: 'var(--border)',
+                        input: 'var(--input)',
+                        ring: 'var(--ring)',
+                    },
+                    borderRadius: {
+                        DEFAULT: 'var(--radius)',
+                    },
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-foreground min-h-screen">
+    <div class="min-h-screen">
+        <!-- 网页总标题 -->
+        <div class="bg-primary text-primary-foreground py-2 px-4">
+            <h1 class="text-lg font-bold">AI趋势新闻自动发布系统</h1>
+        </div>
+        
+        <div class="container mx-auto px-4 py-6 max-w-7xl">
+            <!-- 主标题 -->
+            <h1 class="text-3xl font-bold mb-8 text-center text-foreground">AI趋势发布系统</h1>
+
+            <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                <div class="lg:col-span-3">
+                    <!-- 工作流配置面板 -->
+                    <div class="shadcn-card p-6 mb-6">
+                        <h2 class="text-xl font-semibold mb-4 text-foreground">工作流配置</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <div class="space-y-2">
+                                <label class="shadcn-label">定时触发</label>
+                                <select id="scheduleEnabled" class="shadcn-select">
+                                    <option value="false">关闭</option>
+                                    <option value="true">开启</option>
+                                </select>
+                            </div>
+                            <div class="space-y-2">
+                                <label class="shadcn-label">触发时间</label>
+                                <div class="flex space-x-2">
+                                    <select id="scheduleHour" class="shadcn-select flex-1">
+                                        <!-- 小时选项将由JS生成 -->
+                                    </select>
+                                    <select id="scheduleMinute" class="shadcn-select flex-1">
+                                        <!-- 分钟选项将由JS生成 -->
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="space-y-2">
+                                <label class="shadcn-label">工作流类型</label>
+                                <select id="workflowType" class="shadcn-select">
+                                    <option value="weixin-article-workflow">微信文章工作流</option>
+                                    <option value="weixin-aibench-workflow">微信AI基准工作流</option>
+                                    <option value="weixin-hellogithub-workflow">微信HelloGithub工作流</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button id="manualTriggerBtn" class="shadcn-button shadcn-button-primary w-full">
+                            🚀 手动触发工作流
+                        </button>
+                    </div>
+
+                    <!-- API配置 -->
+                    <div class="shadcn-card p-6 mb-6">
+                        <h2 class="text-xl font-semibold mb-4 text-foreground">API 配置</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="space-y-2">
+                                <label class="shadcn-label">API 地址</label>
+                                <input type="text" id="apiUrl" value="http://127.0.0.1:8000" 
+                                       placeholder="http://127.0.0.1:8000"
+                                       class="shadcn-input">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="shadcn-label">API 密钥</label>
+                                <input type="password" id="apiKey" placeholder="请输入 API 密钥"
+                                       class="shadcn-input">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="shadcn-label">操作</label>
+                                <div class="flex items-end">
+                                    <button id="testConnection" class="shadcn-button shadcn-button-secondary w-full">
+                                        🔗 测试连接
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="debugStatus" class="mt-4 text-sm text-muted-foreground"></div>
+                    </div>
+
+                    <!-- 数据源管理 -->
+                    <div class="shadcn-card p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-semibold text-foreground">数据源管理</h2>
+                            <div class="flex space-x-2">
+                                <button id="addWebPageBtn" class="shadcn-button shadcn-button-primary">
+                                    <span class="mr-1">🌐</span>
+                                    添加爬取网页
+                                </button>
+                                <button id="addTwitterBtn" class="shadcn-button shadcn-button-primary">
+                                    <span class="mr-1">🐦</span>
+                                    添加X关注
+                                </button>
+                                <button id="batchAddBtn" class="shadcn-button shadcn-button-secondary">
+                                    <span class="mr-1">📋</span>
+                                    批量添加
+                                </button>
+                                <button id="batchExportBtn" class="shadcn-button shadcn-button-secondary">
+                                    <span class="mr-1">📤</span>
+                                    批量导出
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="text-center p-4 bg-muted rounded">
+                                <div class="text-2xl font-bold text-foreground" id="totalSources">0</div>
+                                <div class="text-sm text-muted-foreground">总数据源</div>
+                            </div>
+                            <div class="text-center p-4 bg-muted rounded">
+                                <div class="text-2xl font-bold text-foreground" id="activeSources">0</div>
+                                <div class="text-sm text-muted-foreground">活跃数据源</div>
+                            </div>
+                            <div class="text-center p-4 bg-muted rounded">
+                                <div class="text-2xl font-bold text-foreground" id="lastUpdate">未更新</div>
+                                <div class="text-sm text-muted-foreground">最后更新</div>
+                            </div>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="shadcn-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 80px;">序号</th>
+                                        <th style="width: 120px;">平台</th>
+                                        <th style="width: calc(100% - 320px); max-width: 400px;">标识符</th>
+                                        <th style="width: 120px;">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dataSourcesTable">
+                                    <!-- 数据源列表将由JavaScript动态生成 -->
+                                </tbody>
+                            </table>
+                            <div id="emptyState" class="hidden text-center py-8 text-muted-foreground">
+                                <p>暂无数据源</p>
+                                <p class="text-sm mt-2">点击上方按钮添加数据源</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右侧日志面板 -->
+                <div class="lg:col-span-2 flex flex-col">
+                    <div class="shadcn-card p-6 flex-1 flex flex-col">
+                        <h2 class="text-xl font-semibold mb-4 text-foreground">系统日志</h2>
+                        <div id="logPanel" class="log-panel flex-1 overflow-y-auto">
+                            <div class="p-4 text-center text-muted-foreground">
+                                等待系统初始化...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 网页数据源模态框 -->
+    <div id="webPageModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="shadcn-card p-6 max-w-md w-full mx-4">
+            <h2 class="text-lg font-semibold mb-4 text-foreground">添加爬取网页</h2>
+            <form id="webPageForm">
+                <input type="hidden" id="webPageId">
+                <div class="space-y-4">
+                    <div>
+                        <label class="shadcn-label">网页地址</label>
+                        <input type="url" id="webPageUrl" placeholder="https://example.com" 
+                               class="shadcn-input" required>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" onclick="app.hideModal('webPageModal')" class="shadcn-button shadcn-button-secondary">
+                        取消
+                    </button>
+                    <button type="submit" class="shadcn-button shadcn-button-primary">
+                        确认添加
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Twitter数据源模态框 -->
+    <div id="twitterModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="shadcn-card p-6 max-w-md w-full mx-4">
+            <h2 class="text-lg font-semibold mb-4 text-foreground">添加X关注</h2>
+            <form id="twitterForm">
+                <input type="hidden" id="twitterId">
+                <div class="space-y-4">
+                    <div>
+                        <label class="shadcn-label">X用户名</label>
+                        <input type="text" id="twitterUsername" placeholder="@username 或 username" 
+                               class="shadcn-input" required>
+                        <p class="text-xs text-muted-foreground mt-1">
+                            请输入X(Twitter)用户名，例如：@elonmusk 或 elonmusk
+                        </p>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" onclick="app.hideModal('twitterModal')" class="shadcn-button shadcn-button-secondary">
+                        取消
+                    </button>
+                    <button type="submit" class="shadcn-button shadcn-button-primary">
+                        确认添加
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 手动触发模态框 -->
+    <div id="triggerModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="shadcn-card p-6 max-w-md w-full mx-4">
+            <h2 class="text-lg font-semibold mb-4 text-foreground">手动触发工作流</h2>
+            <form id="triggerForm">
+                <div class="space-y-4">
+                    <div>
+                        <label class="shadcn-label">选择工作流类型</label>
+                        <select id="triggerWorkflowType" class="shadcn-select" required>
+                            <option value="">请选择...</option>
+                            <option value="weixin-article-workflow">微信文章工作流</option>
+                            <option value="weixin-aibench-workflow">微信AI基准工作流</option>
+                            <option value="weixin-hellogithub-workflow">微信HelloGithub工作流</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" onclick="app.hideModal('triggerModal')" class="shadcn-button shadcn-button-secondary">
+                        取消
+                    </button>
+                    <button type="submit" class="shadcn-button shadcn-button-primary">
+                        触发工作流
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 批量添加模态框 -->
+    <div id="batchModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="shadcn-card p-6 max-w-2xl w-full mx-4">
+            <h2 class="text-lg font-semibold mb-4 text-foreground">批量添加数据源</h2>
+            <form id="batchForm">
+                <div class="space-y-4">
+                    <div>
+                        <label class="shadcn-label">数据源列表</label>
+                        <textarea id="batchContent" placeholder="请输入数据源，每行一个：&#10;https://example.com&#10;@username&#10;https://another-site.com" 
+                                  class="shadcn-textarea" rows="8" required></textarea>
+                        <p class="text-xs text-muted-foreground mt-1">
+                            每行一个数据源，支持网页URL和Twitter用户名（@username格式）
+                        </p>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" onclick="app.hideModal('batchModal')" class="shadcn-button shadcn-button-secondary">
+                        取消
+                    </button>
+                    <button type="submit" class="shadcn-button shadcn-button-primary">
+                        批量添加
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 批量导出模态框 -->
+    <div id="exportModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="shadcn-card p-6 max-w-2xl w-full mx-4">
+            <h2 class="text-lg font-semibold mb-4 text-foreground">批量导出数据源</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="shadcn-label">导出内容（可直接复制粘贴到批量添加）</label>
+                    <textarea id="exportContent" class="shadcn-textarea" rows="12" readonly></textarea>
+                </div>
+                <div class="text-sm text-muted-foreground">
+                    已导出 <span id="exportCount">0</span> 个数据源，请手动选择并复制上面的内容。
+                </div>
+            </div>
+            <div class="flex justify-end space-x-3 mt-6">
+                <button type="button" onclick="app.hideModal('exportModal')" class="shadcn-button shadcn-button-secondary">
+                    关闭
+                </button>
+                <button type="button" onclick="app.selectAllExportContent()" class="shadcn-button shadcn-button-primary">
+                    全选内容
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 确认删除模态框 -->
+    <div id="confirmModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="shadcn-card p-6 max-w-md w-full mx-4">
+            <h2 class="text-lg font-semibold mb-4 text-foreground">确认删除</h2>
+            <p class="text-muted-foreground mb-6">确定要删除这个数据源吗？此操作无法撤销。</p>
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="app.hideModal('confirmModal')" class="shadcn-button shadcn-button-secondary">
+                    取消
+                </button>
+                <button id="confirmDeleteBtn" class="shadcn-button shadcn-button-destructive">
+                    确认删除
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- API密钥初始化模态框 -->
+    <div id="apiKeyInitModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="shadcn-card p-6 max-w-md w-full mx-4">
+            <h2 class="text-lg font-semibold mb-4 text-foreground">配置API密钥</h2>
+            <p class="text-sm text-muted-foreground mb-4">请输入API密钥以使用系统功能：</p>
+            <form id="apiKeyInitForm">
+                <div class="space-y-4">
+                    <div>
+                        <label class="shadcn-label">API地址</label>
+                        <input type="text" id="initApiUrl" value="http://127.0.0.1:8000" 
+                               class="shadcn-input">
+                    </div>
+                    <div>
+                        <label class="shadcn-label">API密钥</label>
+                        <input type="password" id="initApiKey" placeholder="请输入您的API密钥" 
+                               class="shadcn-input">
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="submit" class="shadcn-button shadcn-button-primary">
+                        保存并继续
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 消息容器 -->
+    <div id="messageContainer" class="fixed top-4 right-4 z-50"></div>
+    
+    <!-- 版本号显示 -->
+    <div class="version-display">
+        v0.0.3
+    </div>
+
+    <!-- 加载指示器 -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="shadcn-card p-6 flex items-center space-x-3">
+            <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+            <span class="text-foreground">处理中...</span>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

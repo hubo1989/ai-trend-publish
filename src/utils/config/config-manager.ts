@@ -68,7 +68,7 @@ export class ConfigManager {
     }
 
     console.warn(
-      `Failed to get config "${key}" after ${options.maxAttempts} attempts. Last error: ${lastError?.message}`,
+      `Failed to get config "${key}" after ${options.maxAttempts} attempts. Last error: ${lastError ? lastError.message : "Unknown error"}`,
     );
     return null;
   }

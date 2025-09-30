@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORS 专项测试工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        input {
+            width: 300px;
+            padding: 6px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .url-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .url-button {
+            background: #6c757d;
+            font-size: 12px;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        .step {
+            background: #f8f9fa;
+            padding: 10px;
+            margin: 10px 0;
+            border-left: 4px solid #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 CORS 专项测试工具</h1>
+        <p>专门用于诊断跨域请求问题，特别是Docker容器环境下的CORS配置</p>
+    </div>
+
+    <div class="container">
+        <div class="test-section">
+            <h3>步骤1: 基础连通性测试</h3>
+            <p>首先测试各种可能的服务器地址的基础连通性</p>
+            <div class="url-grid">
+                <button class="url-button" onclick="testBasicConnection('http://localhost:8000')">localhost:8000</button>
+                <button class="url-button" onclick="testBasicConnection('http://127.0.0.1:8000')">127.0.0.1:8000</button>
+                <button class="url-button" onclick="testBasicConnection('http://0.0.0.0:8000')">0.0.0.0:8000</button>
+                <button class="url-button" onclick="testBasicConnection('http://host.docker.internal:8000')">host.docker.internal:8000</button>
+            </div>
+            <div id="basicResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>步骤2: OPTIONS 预检请求测试</h3>
+            <p>测试CORS预检请求是否正确响应</p>
+            <input type="text" id="optionsUrl" value="http://localhost:8000/api/workflow" placeholder="API地址">
+            <button onclick="testOptionsRequest()">测试OPTIONS请求</button>
+            <div id="optionsResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>步骤3: 实际API请求测试</h3>
+            <p>测试真实的API请求</p>
+            <div>
+                <input type="text" id="apiUrl" value="http://localhost:8000/api/workflow" placeholder="API地址">
+                <input type="password" id="apiKey" placeholder="API密钥">
+                <button onclick="testRealAPI()">测试真实API</button>
+            </div>
+            <div id="apiResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>步骤4: 无认证测试</h3>
+            <p>测试不带认证头的请求（排除认证问题）</p>
+            <input type="text" id="noAuthUrl" value="http://localhost:8000/api/workflow" placeholder="API地址">
+            <button onclick="testWithoutAuth()">测试无认证请求</button>
+            <div id="noAuthResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>步骤5: 简单GET请求测试</h3>
+            <p>测试最简单的GET请求</p>
+            <input type="text" id="getUrl" value="http://localhost:8000" placeholder="服务器地址">
+            <button onclick="testSimpleGet()">测试GET请求</button>
+            <div id="getResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>诊断建议</h3>
+            <div id="diagnosticAdvice" class="result info">
+                请按顺序执行上述测试，每个步骤的结果将帮助定位问题所在：
+                
+                1. 基础连通性失败 → 网络/端口问题
+                2. OPTIONS请求失败 → CORS预检配置问题  
+                3. API请求失败 → 认证或具体API问题
+                4. 无认证请求成功 → 认证配置问题
+                5. GET请求成功 → POST方法或JSON-RPC问题
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 测试基础连通性
+        async function testBasicConnection(url) {
+            const result = document.getElementById('basicResult');
+            result.textContent = `测试基础连通性: ${url}...`;
+            result.className = 'result info';
+
+            try {
+                // 使用 no-cors 模式测试基础连通性
+                const response = await fetch(url, {
+                    method: 'GET',
+                    mode: 'no-cors',
+                    cache: 'no-cache'
+                });
+                
+                result.textContent = `✅ ${url} 基础连通性正常
+响应类型: ${response.type}
+状态: ${response.status || 'opaque'}
+
+这表明服务器可达，但可能存在CORS限制。`;
+                result.className = 'result success';
+                
+            } catch (error) {
+                result.textContent = `❌ ${url} 基础连通性失败
+错误: ${error.message}
+
+可能原因:
+1. 服务器未运行
+2. 端口未开放
+3. 网络连接问题
+4. 防火墙阻止`;
+                result.className = 'result error';
+            }
+        }
+
+        // 测试OPTIONS预检请求
+        async function testOptionsRequest() {
+            const url = document.getElementById('optionsUrl').value;
+            const result = document.getElementById('optionsResult');
+            result.textContent = `测试OPTIONS预检请求: ${url}...`;
+            result.className = 'result info';
+
+            try {
+                const response = await fetch(url, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Access-Control-Request-Method': 'POST',
+                        'Access-Control-Request-Headers': 'Content-Type, Authorization'
+                    }
+                });
+
+                const headers = {};
+                response.headers.forEach((value, key) => {
+                    headers[key] = value;
+                });
+
+                let resultText = `OPTIONS预检请求结果:
+状态码: ${response.status}
+状态文本: ${response.statusText}
+
+响应头部:
+${Object.entries(headers).map(([k,v]) => `  ${k}: ${v}`).join('\n')}
+
+CORS关键头部检查:`;
+
+                const corsChecks = [
+                    { header: 'access-control-allow-origin', value: headers['access-control-allow-origin'], required: true },
+                    { header: 'access-control-allow-methods', value: headers['access-control-allow-methods'], required: true },
+                    { header: 'access-control-allow-headers', value: headers['access-control-allow-headers'], required: true },
+                    { header: 'access-control-max-age', value: headers['access-control-max-age'], required: false }
+                ];
+
+                let allGood = true;
+                corsChecks.forEach(check => {
+                    const status = check.value ? '✅' : (check.required ? '❌' : '⚠️');
+                    resultText += `\n  ${status} ${check.header}: ${check.value || '未设置'}`;
+                    if (check.required && !check.value) allGood = false;
+                });
+
+                if (response.status === 200 && allGood) {
+                    resultText += '\n\n✅ CORS预检配置正常';
+                    result.className = 'result success';
+                } else {
+                    resultText += '\n\n❌ CORS预检配置有问题';
+                    result.className = 'result error';
+                }
+
+                result.textContent = resultText;
+
+            } catch (error) {
+                result.textContent = `❌ OPTIONS请求失败: ${error.message}
+
+可能原因:
+1. 服务器不支持OPTIONS方法
+2. CORS预检被阻止
+3. 网络连接问题`;
+                result.className = 'result error';
+            }
+        }
+
+        // 测试真实API请求
+        async function testRealAPI() {
+            const url = document.getElementById('apiUrl').value;
+            const apiKey = document.getElementById('apiKey').value;
+            const result = document.getElementById('apiResult');
+            
+            if (!apiKey) {
+                result.textContent = '❌ 请输入API密钥';
+                result.className = 'result error';
+                return;
+            }
+
+            result.textContent = `测试真实API请求: ${url}...`;
+            result.className = 'result info';
+
+            const requestBody = {
+                jsonrpc: '2.0',
+                method: 'getDataSources',
+                params: {},
+                id: Date.now()
+            };
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                const responseText = await response.text();
+                let responseData;
+                
+                try {
+                    responseData = JSON.parse(responseText);
+                } catch (e) {
+                    responseData = { raw: responseText };
+                }
+
+                const headers = {};
+                response.headers.forEach((value, key) => {
+                    headers[key] = value;
+                });
+
+                const resultText = `真实API请求结果:
+状态码: ${response.status}
+状态文本: ${response.statusText}
+
+请求详情:
+  Method: POST
+  Headers: Content-Type, Authorization
+  Body: ${JSON.stringify(requestBody, null, 2)}
+
+响应头部:
+${Object.entries(headers).map(([k,v]) => `  ${k}: ${v}`).join('\n')}
+
+响应体:
+${JSON.stringify(responseData, null, 2)}`;
+
+                result.textContent = resultText;
+                result.className = response.ok ? 'result success' : 'result error';
+
+            } catch (error) {
+                result.textContent = `❌ API请求失败: ${error.message}
+
+错误分析:
+${error.name === 'TypeError' && error.message.includes('fetch') ? 
+  '- 这是网络错误，通常由CORS问题引起\n- 检查浏览器开发者工具的Network和Console面板' :
+  '- 其他类型的错误，请检查网络连接和服务器状态'}`;
+                result.className = 'result error';
+            }
+        }
+
+        // 测试无认证请求
+        async function testWithoutAuth() {
+            const url = document.getElementById('noAuthUrl').value;
+            const result = document.getElementById('noAuthResult');
+            
+            result.textContent = `测试无认证请求: ${url}...`;
+            result.className = 'result info';
+
+            const requestBody = {
+                jsonrpc: '2.0',
+                method: 'getDataSources',
+                params: {},
+                id: Date.now()
+            };
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                const responseText = await response.text();
+                
+                result.textContent = `无认证请求结果:
+状态码: ${response.status}
+状态文本: ${response.statusText}
+响应: ${responseText}
+
+${response.status === 401 ? 
+  '✅ 收到401认证错误，说明CORS工作正常，问题在于API密钥' : 
+  response.ok ? 
+    '✅ 请求成功，CORS配置正常' : 
+    '❌ 请求失败，可能是CORS或其他问题'}`;
+
+                result.className = response.status === 401 || response.ok ? 'result warning' : 'result error';
+
+            } catch (error) {
+                result.textContent = `❌ 无认证请求失败: ${error.message}
+
+这通常表明CORS配置有问题，请检查服务器CORS设置。`;
+                result.className = 'result error';
+            }
+        }
+
+        // 测试简单GET请求
+        async function testSimpleGet() {
+            const url = document.getElementById('getUrl').value;
+            const result = document.getElementById('getResult');
+            
+            result.textContent = `测试简单GET请求: ${url}...`;
+            result.className = 'result info';
+
+            try {
+                const response = await fetch(url, {
+                    method: 'GET'
+                });
+
+                const responseText = await response.text();
+                
+                result.textContent = `GET请求结果:
+状态码: ${response.status}
+状态文本: ${response.statusText}
+响应长度: ${responseText.length}字符
+响应预览: ${responseText.substring(0, 200)}${responseText.length > 200 ? '...' : ''}
+
+${response.ok ? '✅ GET请求成功，基础HTTP通信正常' : '❌ GET请求失败'}`;
+
+                result.className = response.ok ? 'result success' : 'result error';
+
+            } catch (error) {
+                result.textContent = `❌ GET请求失败: ${error.message}
+
+这表明基础HTTP连接有问题。`;
+                result.className = 'result error';
+            }
+        }
+
+        // 页面加载时的提示
+        window.onload = function() {
+            const advice = document.getElementById('diagnosticAdvice');
+            advice.innerHTML = `<strong>CORS诊断流程：</strong>
+
+<div class="step">
+<strong>步骤1:</strong> 测试基础连通性
+- 如果失败：检查Docker端口映射和网络配置
+- 如果成功：继续下一步
+</div>
+
+<div class="step">
+<strong>步骤2:</strong> 测试OPTIONS预检
+- 如果失败：后端未正确处理OPTIONS请求
+- 如果成功但缺少CORS头：后端CORS配置不完整
+</div>
+
+<div class="step">
+<strong>步骤3:</strong> 测试真实API
+- 如果失败且步骤2成功：可能是认证问题
+- 如果都失败：CORS配置问题
+</div>
+
+<div class="step">
+<strong>步骤4:</strong> 测试无认证请求
+- 如果返回401：CORS正常，问题是API密钥
+- 如果失败：CORS配置问题
+</div>
+
+<div class="step">
+<strong>步骤5:</strong> 测试GET请求
+- 如果成功：问题可能在POST方法或JSON处理
+- 如果失败：基础HTTP通信问题
+</div>
+
+<strong>常见解决方案：</strong>
+1. 确保Docker端口映射：-p 8000:8000
+2. 检查后端CORS头部设置
+3. 验证API密钥正确性
+4. 尝试不同的服务器地址`;
+        };
+    </script>
+</body>
+</html>
+

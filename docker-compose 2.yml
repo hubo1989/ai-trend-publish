@@ -1,0 +1,206 @@
+services:
+  aiclient2api:
+    image: aiclient2api
+    container_name: aiclient2api-multi
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./aiclient2api/credentials:/app/credentials
+      - ./aiclient2api/config:/app/config:ro
+      - ./aiclient2api/logs:/app/logs
+    environment:
+      - ARGS=--api-key ${API_KEY} --provider-pools-file /app/config/provider_pools.json --system-prompt-file /app/config/system_prompt.txt --qwen-oauth-creds-file /app/credentials/qwen_oauth_creds.json --enable-routing --log-prompts file --kiro-oauth-creds-file /app/credentials/kiro_oauth_creds.json
+      - TZ=Asia/Shanghai
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "healthcheck.js"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "com.aiclient2api.service=main"
+      - "com.aiclient2api.auto-restart=daily"
+    networks:
+      - docker-network
+ # ngrok 服务
+  ngrok:
+    image: ngrok/ngrok
+    container_name: my-ngrok
+    ports:
+      - "4040:4040" # 暴露 ngrok 的 Web UI 界面
+    environment:
+      - NGROK_AUTHTOKEN=32uJt1g9ji2YO3xryegWydCQE0c_6nPprh3kzurjYUeBgFxcC
+    command:
+      - "http"
+      - "aiclient2api:3000"
+      - "--host-header=localhost:3000"
+      - "--url=amberly-postthalamic-relishingly.ngrok-free.app"
+    networks:
+      - docker-network
+    depends_on:
+      - aiclient2api
+  db:
+    image: mysql:${MYSQL_VERSION:-8.0}
+    container_name: ai-trend-db
+    ports:
+      - "${DB_EXTERNAL_PORT:-3306}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE:-trendfinder}
+      MYSQL_USER: ${DB_USER:-trendfinder}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_CHARSET: utf8mb4
+      MYSQL_COLLATION: utf8mb4_unicode_ci
+    volumes:
+      # 数据持久化 - 这是关键！
+      - db_data:/var/lib/mysql
+      # 配置文件
+      - ./docker-configs/mysql.conf:/etc/mysql/conf.d/mysql.conf:ro
+    networks:
+      - docker-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Redis缓存服务
+  redis:
+    image: redis:${REDIS_VERSION:-7-alpine}
+    container_name: ai-trend-redis
+    ports:
+      - "${REDIS_EXTERNAL_PORT:-6379}:6379"
+    volumes:
+      # Redis数据持久化
+      - redis_data:/data
+      - ./docker-configs/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - docker-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    command: >
+      redis-server 
+      ${REDIS_PASSWORD:+--requirepass $REDIS_PASSWORD}
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+
+  # 数据库初始化服务（使用您的方式）
+  drizzle-init:
+    image: ${BACKEND_IMAGE:-ai-trend-backend:latest}
+    container_name: drizzle-init
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=db
+      - DB_PORT=3306
+    command: deno run -A npm:drizzle-kit push
+    networks:
+      - docker-network
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"  # 只运行一次
+    profiles:
+      - init  # 使用profile控制，需要时才运行
+
+  backend:
+    image: ${BACKEND_IMAGE:-ai-trend-backend:latest}
+    container_name: ai-trend-backend
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    env_file:
+      - .env
+    volumes:
+      # 应用数据持久化
+      - ./ai-trend-publish/app_logs:/app/logs
+      - ./ai-trend-publish/app_uploads:/app/uploads
+    networks:
+      - docker-network
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # 前端Web服务
+  frontend:
+    image: ${FRONTEND_IMAGE:-ai-trend-frontend:latest}
+    container_name: ai-trend-frontend
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    networks:
+      - docker-network
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  docker-network:
+    name: ${NETWORK_NAME:-docker-network}
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: ${NETWORK_SUBNET:-192.168.100.0/24}
+          gateway: ${NETWORK_GATEWAY:-192.168.100.1}
+
+volumes:
+  # 数据库数据持久化卷
+  db_data:
+    name: ${PROJECT_NAME:-ai-trend-publish}_db_data
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_DIR:-./data}/mysql
+
+  # Redis数据持久化卷
+  redis_data:
+    name: ${PROJECT_NAME:-ai-trend-publish}_redis_data
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_DIR:-./data}/redis
+
+  # 应用日志持久化
+  app_logs:
+    name: ${PROJECT_NAME:-ai-trend-publish}_app_logs
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_DIR:-./data}/logs
+
+  # 应用上传文件持久化
+  app_uploads:
+    name: ${PROJECT_NAME:-ai-trend-publish}_app_uploads
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_DIR:-./data}/uploads
+
