@@ -41,6 +41,17 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+.env.production
+.env.development
+.env.test
+
+# Credentials and sensitive files
+credentials/
+*.credentials
+*_credentials.json
+*_oauth_creds.json
+provider_pools.json
+config.json
 
 # Temp files
 temp/
